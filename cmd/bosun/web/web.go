@@ -582,6 +582,8 @@ func Config(t miniprofiler.Timer, w http.ResponseWriter, r *http.Request) {
 			serveError(w, err)
 			return
 		}
+	} else if include := r.FormValue("include"); include != "" {
+		text = schedule.Conf.IncludeFiles[include]
 	} else {
 		text = schedule.Conf.RawText
 	}

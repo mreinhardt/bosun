@@ -31,7 +31,7 @@ import (
 type Conf struct {
 	Vars
 	Name             string        // Config file name
-	IncludeFiles     string        // Config include files glob string
+	IncludeFiles     map[string]string // Config include file names and contents
 	CheckFrequency   time.Duration // Time between alert checks: 5m
 	DefaultRunEvery  int           // Default number of check intervals to run each alert: 1
 	HTTPListen       string        // Web server listen address: :80
@@ -340,7 +340,7 @@ func New(name, text string) (c *Conf, err error) {
 	defer errRecover(&err)
 	c = &Conf{
 		Name:             name,
-		IncludeFiles:     "",
+		IncludeFiles:     make(map[string]string),
 		CheckFrequency:   time.Minute * 5,
 		DefaultRunEvery:  1,
 		HTTPListen:       ":8070",
@@ -354,7 +354,7 @@ func New(name, text string) (c *Conf, err error) {
 		Templates:        make(map[string]*Template),
 		Alerts:           make(map[string]*Alert),
 		Notifications:    make(map[string]*Notification),
-		RawText:          "",
+		RawText:          text,
 		bodies:           htemplate.New(name).Funcs(htemplate.FuncMap(defaultFuncs)),
 		subjects:         ttemplate.New(name).Funcs(defaultFuncs),
 		Lookups:          make(map[string]*Lookup),
@@ -365,7 +365,6 @@ func New(name, text string) (c *Conf, err error) {
 }
 
 func (c *Conf) Update(text string) {
-	c.RawText = fmt.Sprint(c.RawText, "\n", text)
 	ctree, err := parse.Parse(c.Name, text)
 	c.tree = ctree
 	if err != nil {
@@ -546,17 +545,19 @@ func (c *Conf) loadGlobal(p *parse.PairNode) {
 	}
 }
 
-func (c *Conf) loadIncludeFiles(includeFiles string) {
-	confFilenames, err := filepath.Glob(includeFiles)
+func (c *Conf) loadIncludeFiles(includeFilesGlob string) {
+	includeFiles, err := filepath.Glob(includeFilesGlob)
 	if err != nil {
 		c.error(err)
 	}
-	for _, confFilename := range confFilenames {
-		f, err := ioutil.ReadFile(confFilename)
+	for _, fileName := range includeFiles {
+		f, err := ioutil.ReadFile(fileName)
 		if err != nil {
 			c.error(err)
 		}
-		c.Update(string(f))
+		fileContents := string(f)
+		c.IncludeFiles[filepath.Base(fileName)] = fileContents
+		c.Update(fileContents)
 	}
 }
 
